@@ -44,6 +44,7 @@ defmodule Mariaex do
     * `:socket_options` - Options to be given to the underlying socket;
     * `:cache_size` - Prepared statement cache size (default: 100);
     * `:insecure_auth` - Secure authorization (default: false)
+    * `:clear_password` - Allow sending of password in cleartext if requested by server
     * `:after_connect` - A function to run on connect, either a 1-arity fun
        called with a connection reference, `{module, function, args}` with the
        connection reference prepended to `args` or `nil`, (default: `nil`)

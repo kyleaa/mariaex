@@ -19,6 +19,7 @@ defmodule Mariaex.Protocol do
 
   @maxpacketbytes 50000000
   @mysql_native_password "mysql_native_password"
+  @mysql_clear_password :mysql_clear_password
   @mysql_old_password :mysql_old_password
 
   @client_long_password     0x00000001
@@ -33,6 +34,7 @@ defmodule Mariaex.Protocol do
   @client_multi_statements  0x00010000
   @client_multi_results     0x00020000
   @client_ps_multi_results  0x00040000
+  @client_plugin_auth       0x00080000
   @client_deprecate_eof     0x01000000
 
   @server_more_results_exists  0x0008
@@ -45,7 +47,7 @@ defmodule Mariaex.Protocol do
   @capabilities @client_long_password     ||| @client_found_rows        ||| @client_long_flag |||
                 @client_local_files       ||| @client_protocol_41       ||| @client_transactions |||
                 @client_secure_connection ||| @client_multi_statements  ||| @client_multi_results |||
-                @client_ps_multi_results  ||| @client_deprecate_eof
+                @client_ps_multi_results  ||| @client_deprecate_eof ||| @client_plugin_auth
 
   defstruct sock: nil,
             state: nil,
@@ -185,7 +187,19 @@ defmodule Mariaex.Protocol do
         {:error, error}
     end
   end
-  defp handle_handshake(packet(seqnum: seqnum, 
+
+  defp handle_handshake(packet(seqnum: seqnum, msg: @mysql_clear_password) = packet, _msg, %{opts: opts, sock: {Mariaex.Connection.Ssl, _}} = state) do
+    if opts[:clear_password] do
+      password = opts[:password]
+      msg_send(clear_password(password: password), state, seqnum + 1)
+      handshake_recv(state, nil)
+    else
+      {:error, %Mariaex.Error{message: "MySQL server is requesting a cleartext password. " <>
+                                       "Use the `clear_password: true` option."}}
+    end
+  end
+
+  defp handle_handshake(packet(seqnum: seqnum,
                                msg: handshake(capability_flags_1: flag1,
                                               capability_flags_2: flag2,
                                               plugin: plugin) = handshake) = _packet,  %{opts: opts}, s) do
@@ -992,6 +1006,7 @@ defmodule Mariaex.Protocol do
   defp password(@mysql_native_password <> _, password, salt), do: mysql_native_password(password, salt)
   defp password("", password, salt),                  do: mysql_native_password(password, salt)
   defp password(@mysql_old_password, password, salt), do: mysql_old_password(password, salt)
+  defp password(@mysql_clear_password, password, _salt), do: password
 
   defp mysql_native_password(password, salt) do
     stage1 = :crypto.hash(:sha, password)
