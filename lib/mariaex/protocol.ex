@@ -127,6 +127,13 @@ defmodule Mariaex.Protocol do
     |> Keyword.update!(:port, &normalize_port/1)
   end
 
+  defp fetch_password(opts) do
+    case opts[:password] do
+      func when is_function(func) -> func.()
+      other -> other
+    end
+  end
+
   defp parse_host(host) do
     host = if is_binary(host), do: String.to_char_list(host), else: host
 
@@ -190,7 +197,7 @@ defmodule Mariaex.Protocol do
 
   defp handle_handshake(packet(seqnum: seqnum, msg: @mysql_clear_password) = packet, _msg, %{opts: opts, sock: {Mariaex.Connection.Ssl, _}} = state) do
     if opts[:clear_password] do
-      password = opts[:password]
+      password = fetch_password(opts)
       msg_send(clear_password(password: password), state, seqnum + 1)
       handshake_recv(state, nil)
     else
@@ -206,7 +213,7 @@ defmodule Mariaex.Protocol do
     <<flag :: size(32)>> = <<flag2 :: size(16), flag1 :: size(16)>>
     deprecated_eof = (flag &&& @client_deprecate_eof) == @client_deprecate_eof
     handshake(auth_plugin_data1: salt1, auth_plugin_data2: salt2) = handshake
-    scramble = case password = opts[:password] do
+    scramble = case password = fetch_password(opts) do
       nil -> ""
       ""  -> ""
       _   -> password(plugin, password, <<salt1 :: binary, salt2 :: binary>>)
@@ -991,7 +998,7 @@ defmodule Mariaex.Protocol do
 
   def dispatch(packet(msg: :mysql_old_password), state = %{opts: opts, handshake: handshake}) do
     if opts[:insecure_auth] do
-      password = opts[:password]
+      password = fetch_password(opts)
       %{salt: {salt1, salt2}, seqnum: seqnum} = handshake
       password = password(@mysql_old_password, password, <<salt1 :: binary, salt2 :: binary>>)
       # TODO: rethink seqnum handling

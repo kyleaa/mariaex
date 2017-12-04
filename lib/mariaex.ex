@@ -33,7 +33,8 @@ defmodule Mariaex do
     * `:database` - Database (required, if `:skip_database` not true);
     * `:skip_database` - Flag to set connection without database;
     * `:username` - Username (default: MDBUSER env variable, then USER env var);
-    * `:password` - User password (default MDBPASSWORD);
+    * `:password` - User password (default MDBPASSWORD env variable) - can also be
+       a zero-arity function which will be invoked upon connect;
     * `:encoder` - Custom encoder function;
     * `:decoder` - Custom decoder function;
     * `:sync_connect` - Block in `start_link/1` until connection is set up (default: `false`)
